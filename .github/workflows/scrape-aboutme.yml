@@ -1,9 +1,9 @@
 name: Scrape About.me Pages
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨2点自动运行
+    - cron: '0 2 * * *'
 
 jobs:
   scrape:
@@ -11,27 +11,42 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Run scraper
-        run: |
-          python3 fetch_aboutme.py
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: aboutme-results
-          path: aboutme_results.csv
-          retention-days: 30
-
-      - name: Commit results
+      - name: Configure git
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git add aboutme_results.csv
-          git diff --staged --quiet || git commit -m "Update about.me results: $(date)"
-          git push
+
+      - name: Run scraper
+        run: python3 fetch_aboutme.py
+
+      - name: Check results
+        run: |
+          if [ -f aboutme_results.csv ]; then
+            echo "找到结果文件！"
+            wc -l aboutme_results.csv
+          else
+            echo "未找到结果文件"
+          fi
+
+      - name: Commit results
+        if: always()
+        run: |
+          git add aboutme_results.csv 2>/dev/null || echo "无可提交文件"
+          git diff --staged --quiet || git commit -m "Update results: $(date '+%Y-%m-%d %H:%M')" || echo "提交失败或无变化"
+          git push || echo "推送失败"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aboutme-results-${{ github.run_number }}
+          path: aboutme_results.csv
+          retention-days: 30
