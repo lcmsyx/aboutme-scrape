@@ -1,0 +1,37 @@
+name: Scrape About.me Pages
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 2 * * *'  # 每天凌晨2点自动运行
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run scraper
+        run: |
+          python3 fetch_aboutme.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aboutme-results
+          path: aboutme_results.csv
+          retention-days: 30
+
+      - name: Commit results
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add aboutme_results.csv
+          git diff --staged --quiet || git commit -m "Update about.me results: $(date)"
+          git push
